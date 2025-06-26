@@ -17,13 +17,18 @@ services:
     build:
       context: ./open-webui
       dockerfile: Dockerfile
-      args:
-        - VITE_BASE_URL=/open-webui/
+      # CORREÇÃO: Remover o VITE_BASE_URL personalizado temporariamente
+      # args:
+      #   - VITE_BASE_URL=/open-webui/
     container_name: open-webui
     restart: unless-stopped
+    # ADIÇÃO: Expor diretamente também para debug
+    ports:
+      - "3000:8080"
     environment:
       - OLLAMA_API_BASE_URL=http://ollama:11434
-      - WEBUI_URL_PREFIX=/open-webui
+      # CORREÇÃO: Remover WEBUI_URL_PREFIX temporariamente
+      # - WEBUI_URL_PREFIX=/open-webui
     env_file:
       - .env
     volumes:

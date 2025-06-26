@@ -8,27 +8,33 @@ ARG USE_TIKTOKEN_ENCODING_NAME="cl100k_base"
 ARG BUILD_HASH=dev-build
 ARG UID=0
 ARG GID=0
-# Declara o argumento VITE_BASE_URL para que ele possa ser recebido do docker-compose.
-ARG VITE_BASE_URL=/
+# CORREÇÃO: Definir valor padrão correto
+ARG VITE_BASE_URL=/open-webui/
 
 ######## WebUI frontend ########
 FROM --platform=$BUILDPLATFORM node:22-alpine3.20 AS build
 ARG BUILD_HASH
-# Recebe o argumento VITE_BASE_URL
 ARG VITE_BASE_URL
-
-# >> INÍCIO DA CORREÇÃO <<
-# Define a variável de ambiente que o Vite usa para o caminho base.
-ENV VITE_BASE_URL=${VITE_BASE_URL}
-# >> FIM DA CORREÇÃO <<
 
 WORKDIR /app
 
 RUN apk add --no-cache git
 COPY package.json package-lock.json ./
 RUN npm ci
+
+# CORREÇÃO: Copiar arquivos de configuração primeiro
 COPY . .
+
+# CORREÇÃO: Definir a variável DEPOIS de copiar os arquivos
+ENV VITE_BASE_URL=${VITE_BASE_URL}
 ENV APP_BUILD_HASH=${BUILD_HASH}
+
+# ADIÇÃO: Debug - mostrar configurações
+RUN echo "Building with VITE_BASE_URL: ${VITE_BASE_URL}" && \
+    echo "Current working directory:" && pwd && \
+    echo "Files in directory:" && ls -la
+
+# CORREÇÃO: Build com configurações corretas
 RUN npm run build
 
 ######## WebUI backend ########
@@ -80,11 +86,6 @@ ENV TIKTOKEN_ENCODING_NAME="cl100k_base" \
 
 ## Hugging Face download cache ##
 ENV HF_HOME="/app/backend/data/cache/embedding/models"
-
-## Torch Extensions ##
-# ENV TORCH_EXTENSIONS_DIR="/.cache/torch_extensions"
-
-#### Other models ##########################################################
 
 WORKDIR /app/backend
 
@@ -146,12 +147,6 @@ RUN pip3 install --no-cache-dir uv && \
     python -c "import os; import tiktoken; tiktoken.get_encoding(os.environ['TIKTOKEN_ENCODING_NAME'])"; \
     fi; \
     chown -R $UID:$GID /app/backend/data/
-
-
-
-# copy embedding weight from build
-# RUN mkdir -p /root/.cache/chroma/onnx_models/all-MiniLM-L6-v2
-# COPY --from=build /app/onnx /root/.cache/chroma/onnx_models/all-MiniLM-L6-v2/onnx
 
 # copy built frontend files
 COPY --chown=$UID:$GID --from=build /app/build /app/build
