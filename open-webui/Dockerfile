@@ -1,37 +1,32 @@
 # syntax=docker/dockerfile:1
-# Initialize device type args
-# use build args in the docker build command with --build-arg="BUILDARG=true"
 ARG USE_CUDA=false
 ARG USE_OLLAMA=false
-# Tested with cu117 for CUDA 11 and cu121 for CUDA 12 (default)
 ARG USE_CUDA_VER=cu128
-# any sentence transformer model; models to use can be found at https://huggingface.co/models?library=sentence-transformers
-# Leaderboard: https://huggingface.co/spaces/mteb/leaderboard 
-# for better performance and multilangauge support use "intfloat/multilingual-e5-large" (~2.5GB) or "intfloat/multilingual-e5-base" (~1.5GB)
-# IMPORTANT: If you change the embedding model (sentence-transformers/all-MiniLM-L6-v2) and vice versa, you aren't able to use RAG Chat with your previous documents loaded in the WebUI! You need to re-embed them.
 ARG USE_EMBEDDING_MODEL=sentence-transformers/all-MiniLM-L6-v2
 ARG USE_RERANKING_MODEL=""
-
-# Tiktoken encoding name; models to use can be found at https://huggingface.co/models?library=tiktoken
 ARG USE_TIKTOKEN_ENCODING_NAME="cl100k_base"
-
 ARG BUILD_HASH=dev-build
-# Override at your own risk - non-root configurations are untested
 ARG UID=0
 ARG GID=0
+# Declara o argumento VITE_BASE_URL para que ele possa ser recebido do docker-compose.
+ARG VITE_BASE_URL=/
 
 ######## WebUI frontend ########
 FROM --platform=$BUILDPLATFORM node:22-alpine3.20 AS build
 ARG BUILD_HASH
+# Recebe o argumento VITE_BASE_URL
+ARG VITE_BASE_URL
+
+# >> INÍCIO DA CORREÇÃO <<
+# Define a variável de ambiente que o Vite usa para o caminho base.
+ENV VITE_BASE_URL=${VITE_BASE_URL}
+# >> FIM DA CORREÇÃO <<
 
 WORKDIR /app
 
-# to store git revision in build
 RUN apk add --no-cache git
-
 COPY package.json package-lock.json ./
 RUN npm ci
-
 COPY . .
 ENV APP_BUILD_HASH=${BUILD_HASH}
 RUN npm run build

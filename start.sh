@@ -1,34 +1,36 @@
 #!/bin/bash
-# Saia imediatamente se qualquer comando falhar
+#
+# Script final e robusto para limpar e reiniciar o ambiente Docker.
+# Este script força a reconstrução da imagem do open-webui para evitar problemas de cache.
+#
+
+# Saia imediatamente se qualquer comando falhar.
 set -e
-echo "🧹 Limpando containers, redes e volumes antigos..."
-# Derruba o stack atual e remove volumes anônimos
-docker compose down -v
-# Força remoção de qualquer container existente (mesmo fora do compose)
-echo "🗑️ Removendo todos os containers antigos..."
-docker rm -f $(docker ps -aq) 2>/dev/null || true
-# Remove redes não utilizadas
-echo "🔌 Limpando redes órfãs..."
-docker network prune -f
-# Remove volumes não utilizados
-echo "💾 Limpando volumes órfãos..."
-docker volume prune -f
-echo "🚀 Subindo os serviços..."
-docker compose up -d --force-recreate
+
+# O nome do projeto é derivado do nome da pasta atual, formatado para ser um nome de imagem válido.
+PROJECT_NAME=$(basename "$PWD" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9_.-]//g')
+WEBUI_IMAGE_NAME="${PROJECT_NAME}-open-webui"
+
+
+echo "🛑 Parando todos os serviços e limpando o ambiente do projeto..."
+docker compose down --volumes --remove-orphans
+
+echo ""
+echo "🔥 Forçando a remoção da imagem antiga do Open WebUI para garantir uma reconstrução limpa..."
+# O '|| true' garante que o script não falhe se a imagem não existir na primeira execução.
+docker rmi "${WEBUI_IMAGE_NAME}" 2>/dev/null || true
+
+echo ""
+echo "🚀 Subindo e reconstruindo os serviços em background..."
+# --build: Garante que a imagem seja reconstruída do zero, pois a antiga foi removida.
+docker compose up --build --force-recreate -d
+
 echo ""
 echo "✅ Stack iniciado com sucesso!"
 echo ""
-echo "🌐 Endpoints disponíveis (via Nginx):"
-echo "  - N8N:                   http://localhost/n8n/"
-echo "  - Open WebUI:            http://localhost/open-webui/"
-echo "  - Nginx (raiz, redireciona para N8N): http://localhost"
-echo ""
-echo "⚙️ Portas diretas dos serviços (para uso avançado/interno):"
-echo "  - N8N (direto):          http://localhost:5678"
-echo "  - Open WebUI (direto):   http://localhost:3000"
-echo "  - Ollama API:            http://localhost:11434"
+echo "🌐 Acesse as aplicações através do Nginx nos seguintes links:"
+echo "  - Open WebUI: http://localhost/open-webui/"
+echo "  - SearxNG:    http://localhost/searxng/"
 echo ""
 echo "📦 Containers em execução:"
 docker ps --format "  - {{.Names}} ({{.Status}})"
-echo ""
-echo "🧠 Dica: use 'docker logs -f <nome>' para ver os logs de qualquer container."

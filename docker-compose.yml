@@ -1,109 +1,65 @@
-version: '3.8'
 services:
   nginx:
-    image: nginx:latest
+    image: nginx:1.27-alpine
     container_name: nginx
     restart: always
-    environment:
-      - TZ=America/Sao_Paulo
     ports:
       - "80:80"
     volumes:
-      - ./nginx.local.conf:/etc/nginx/nginx.conf # <--- ALTERADO AQUI
+      - ./nginx.conf:/etc/nginx/conf.d/default.conf:ro
     depends_on:
-      - n8n
       - open-webui
+      - searxng
     networks:
-      app-net:
-        ipv4_address: 172.20.0.2
-  postgres:
-    image: postgres:16-alpine
-    container_name: postgres
-    restart: unless-stopped
-    ports:
-      - 5432:5432
-    environment:
-      - POSTGRES_USER=${POSTGRES_USER}
-      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
-      - POSTGRES_DB=${POSTGRES_DB}
-    volumes:
-      - postgres_storage:/var/lib/postgresql/data
-    healthcheck:
-      test: ['CMD-SHELL', 'pg_isready -h localhost -U ${POSTGRES_USER} -d ${POSTGRES_DB}']
-      interval: 5s
-      timeout: 5s
-      retries: 10
-    networks:
-      app-net:
-        ipv4_address: 172.20.0.5
-  n8n:
-    image: n8nio/n8n:latest
-    container_name: n8n
-    restart: unless-stopped
-    ports:
-      - 5678:5678
-    environment:
-      - DB_TYPE=postgresdb
-      - DB_POSTGRESDB_HOST=postgres
-      - DB_POSTGRESDB_USER=${POSTGRES_USER}
-      - DB_POSTGRESDB_PASSWORD=${POSTGRES_PASSWORD}
-      - N8N_ENCRYPTION_KEY=${N8N_ENCRYPTION_KEY}
-      - N8N_USER_MANAGEMENT_JWT_SECRET=${N8N_USER_MANAGEMENT_JWT_SECRET}
-      - N8N_BASIC_AUTH_ACTIVE=true
-      - N8N_BASIC_AUTH_USER=${N8N_BASIC_AUTH_USER}
-      - N8N_BASIC_AUTH_PASSWORD=${N8N_BASIC_AUTH_PASSWORD}
-      - N8N_HOST=localhost
-      - N8N_PORT=5678
-      - N8N_PROTOCOL=http
-      - WEBHOOK_URL=http://localhost/n8n/
-      - NODE_ENV=production
-    volumes:
-      - n8n_storage:/home/node/.n8n
-      - ./n8n/backup:/backup
-      - ./shared:/data/shared
-    depends_on:
-      postgres:
-        condition: service_healthy
-    networks:
-      app-net:
-        ipv4_address: 172.20.0.7
+      - app-net
+
   open-webui:
     build:
       context: ./open-webui
       dockerfile: Dockerfile
+      args:
+        - VITE_BASE_URL=/open-webui/
     container_name: open-webui
     restart: unless-stopped
-    ports:
-      - "3000:8080"
     environment:
-      - NODE_OPTIONS=--max-old-space-size=4096
-      - OLLAMA_API_BASE_URL=${OLLAMA_API_BASE_URL}
+      - OLLAMA_API_BASE_URL=http://ollama:11434
+      - WEBUI_URL_PREFIX=/open-webui
+    env_file:
+      - .env
     volumes:
-      - open-webui:/app/backend/data
+      - open-webui_data:/app/backend/data
     depends_on:
       - ollama
     networks:
-      app-net:
-        ipv4_address: 172.20.0.10
+      - app-net
+
   ollama:
-    image: ollama/ollama:latest
+    image: ollama/ollama:0.1.44
     container_name: ollama
     restart: unless-stopped
-    ports:
-      - "11434:11434"
     volumes:
-      - ollama:/root/.ollama
+      - ollama_data:/root/.ollama
     networks:
-      app-net:
-        ipv4_address: 172.20.0.11
+      - app-net
+
+  searxng:
+    image: searxng/searxng:latest
+    container_name: searxng
+    restart: unless-stopped
+    environment:
+      - SEARXNG_BASE_URL=http://localhost/searxng/
+    env_file:
+      - .env
+    volumes:
+      - searxng_data:/etc/searxng
+    networks:
+      - app-net
+
 volumes:
-  n8n_storage:
-  postgres_storage:
-  open-webui:
-  ollama:
+  open-webui_data:
+  ollama_data:
+  searxng_data:
+
 networks:
   app-net:
     driver: bridge
-    ipam:
-      config:
-        - subnet: 172.20.0.0/24

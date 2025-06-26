@@ -19,7 +19,7 @@ Este repositório organiza sua stack de automações e AI em um só lugar: **Ope
 1. Clone este repositório:
 
    ```bash
-   git clone https://seu-repo.git && cd seu-repo
+   git clone https://github.com/rafaelamiranda/AutomaLLama.git && cd AutomaLLama
    ```
 2. Copie o arquivo de exemplo de ambiente e preencha os valores:
 
