@@ -1,70 +1,48 @@
+version: '3.8'
+
 services:
-  nginx:
-    image: nginx:1.27-alpine
-    container_name: nginx
-    restart: always
-    ports:
-      - "80:80"
-    volumes:
-      - ./nginx.conf:/etc/nginx/conf.d/default.conf:ro
-    depends_on:
-      - open-webui
-      - searxng
-    networks:
-      - app-net
-
-  open-webui:
-    build:
-      context: ./open-webui
-      dockerfile: Dockerfile
-      # CORREÇÃO: Remover o VITE_BASE_URL personalizado temporariamente
-      # args:
-      #   - VITE_BASE_URL=/open-webui/
-    container_name: open-webui
-    restart: unless-stopped
-    # ADIÇÃO: Expor diretamente também para debug
-    ports:
-      - "3000:8080"
-    environment:
-      - OLLAMA_API_BASE_URL=http://ollama:11434
-      # CORREÇÃO: Remover WEBUI_URL_PREFIX temporariamente
-      # - WEBUI_URL_PREFIX=/open-webui
-    env_file:
-      - .env
-    volumes:
-      - open-webui_data:/app/backend/data
-    depends_on:
-      - ollama
-    networks:
-      - app-net
-
+  # Ollama - Servidor de modelos de IA local
   ollama:
-    image: ollama/ollama:0.1.44
+    image: ollama/ollama:latest
     container_name: ollama
-    restart: unless-stopped
+    ports:
+      - "11434:11434"
     volumes:
       - ollama_data:/root/.ollama
-    networks:
-      - app-net
-
-  searxng:
-    image: searxng/searxng:latest
-    container_name: searxng
-    restart: unless-stopped
+      - /dev/shm:/dev/shm
     environment:
-      - SEARXNG_BASE_URL=http://localhost/searxng/
-    env_file:
-      - .env
-    volumes:
-      - searxng_data:/etc/searxng
+      - OLLAMA_ORIGINS=http://localhost:3000,http://127.0.0.1:3000
+      - OLLAMA_HOST=0.0.0.0
+    restart: unless-stopped
     networks:
-      - app-net
+      - ai-network
+
+  # Open Web UI - Interface web para Ollama
+  open-webui:
+    image: ghcr.io/open-webui/open-webui:main
+    container_name: open-webui
+    ports:
+      - "3000:8080"
+    volumes:
+      - open_webui_data:/app/backend/data
+    environment:
+      - OLLAMA_BASE_URL=http://ollama:11434
+      - WEBUI_SECRET_KEY=seu-secret-key-aqui-mude-isso
+      - WEBUI_NAME=Open Web UI Local
+      - DEFAULT_LOCALE=pt-BR
+      - ENABLE_SIGNUP=true
+      - ENABLE_LOGIN_FORM=true
+      - ENABLE_WEB_SEARCH=true
+    depends_on:
+      - ollama
+    restart: unless-stopped
+    networks:
+      - ai-network
 
 volumes:
-  open-webui_data:
   ollama_data:
-  searxng_data:
+  open_webui_data:
 
 networks:
-  app-net:
+  ai-network:
     driver: bridge
