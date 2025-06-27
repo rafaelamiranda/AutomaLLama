@@ -1,43 +1,54 @@
 version: '3.8'
-
 services:
-  # Ollama - Servidor de modelos de IA local
-  ollama:
-    image: ollama/ollama:latest
-    container_name: ollama
-    ports:
-      - "11434:11434"
-    volumes:
-      - ollama_data:/root/.ollama
-      - /dev/shm:/dev/shm
-    environment:
-      - OLLAMA_ORIGINS=http://localhost:3000,http://127.0.0.1:3000
-      - OLLAMA_HOST=0.0.0.0
-    restart: unless-stopped
-    networks:
-      - ai-network
+      # Ollama - Servidor de modelos de IA local
+      ollama:
+        image: ollama/ollama:latest
+        container_name: ollama
+        ports:
+          - "11434:11434"
+        volumes:
+          - ollama_data:/root/.ollama
+          - /dev/shm:/dev/shm
+        environment:
+          - OLLAMA_ORIGINS=http://localhost:3000,http://127.0.0.1:3000
+          - OLLAMA_HOST=0.0.0.0
+        restart: unless-stopped
+        networks:
+          - ai-network
 
-  # Open Web UI - Interface web para Ollama
-  open-webui:
-    image: ghcr.io/open-webui/open-webui:main
-    container_name: open-webui
-    ports:
-      - "3000:8080"
-    volumes:
-      - open_webui_data:/app/backend/data
-    environment:
-      - OLLAMA_BASE_URL=http://ollama:11434
-      - WEBUI_SECRET_KEY=seu-secret-key-aqui-mude-isso
-      - WEBUI_NAME=Open Web UI Local
-      - DEFAULT_LOCALE=pt-BR
-      - ENABLE_SIGNUP=true
-      - ENABLE_LOGIN_FORM=true
-      - ENABLE_WEB_SEARCH=true
-    depends_on:
-      - ollama
-    restart: unless-stopped
-    networks:
-      - ai-network
+      # Open Web UI - Interface web para Ollama
+      open-webui:
+        image: ghcr.io/open-webui/open-webui:main
+        container_name: open-webui
+        ports:
+          - "3000:8080"
+        volumes:
+          - open_webui_data:/app/backend/data
+        environment:
+          - OLLAMA_BASE_URL=http://ollama:11434
+          - WEBUI_SECRET_KEY=seu-secret-key-aqui-mude-isso
+          - WEBUI_NAME=Open Web UI Local
+          - DEFAULT_LOCALE=pt-BR
+          - ENABLE_SIGNUP=true
+          - ENABLE_LOGIN_FORM=true
+          - ENABLE_WEB_SEARCH=true
+        depends_on:
+          - ollama
+        restart: unless-stopped
+        networks:
+          - ai-network
+
+      # SearxNG - Privacy-respecting Metasearch Engine
+      searxng:
+        image: searxng/searxng:latest
+        container_name: searxng
+        ports:
+          - "8080:8080"
+        environment:
+          - BASE_URL=http://searxng:8080
+        restart: unless-stopped
+        networks:
+          - ai-network
 
 volumes:
   ollama_data:
