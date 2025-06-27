@@ -5,7 +5,7 @@
 
 set -e
 
-echo "🚀 Configurando ambiente Open Web UI + Ollama"
+echo "🚀 Configurando ambiente Open Web UI + Ollama + SearxNG"
 echo "========================================================"
 
 # Verificar se o Docker está instalado
@@ -51,24 +51,155 @@ fi
 # Criar diretórios necessários
 echo "📁 Criando estrutura de diretórios..."
 mkdir -p data/ollama
-mkdir -p data/open-webui
+mkdir -p data/webui
+mkdir -p data/redis
+mkdir -p searxng
+mkdir -p backups
+
+# Definir permissões corretas
+sudo chown -R $USER:$USER data/
+sudo chown -R $USER:$USER searxng/
+
+# Criar configuração do SearxNG se não existir
+if [ ! -f "searxng/settings.yml" ]; then
+    echo "⚙️  Criando configuração do SearxNG..."
+    
+    cat > searxng/settings.yml << 'EOF'
+# Configuração do SearxNG
+use_default_settings: true
+
+general:
+  debug: false
+  instance_name: "SearxNG Local"
+  privacypolicy_url: false
+  donation_url: false
+  contact_url: false
+  enable_metrics: false
+
+search:
+  safe_search: 0
+  autocomplete: "google"
+  autocomplete_min: 4
+  default_lang: "pt-BR"
+  ban_time_on_fail: 5
+  max_ban_time_on_fail: 120
+  formats:
+    - html
+    - json
+
+server:
+  port: 8080
+  bind_address: "0.0.0.0"
+  secret_key: "changeme"
+  base_url: false
+  image_proxy: false
+  http_protocol_version: "1.0"
+  method: "POST"
+  default_http_headers:
+    X-Content-Type-Options: nosniff
+    X-XSS-Protection: 1; mode=block
+    X-Download-Options: noopen
+    X-Robots-Tag: noindex, nofollow
+    Referrer-Policy: no-referrer
+
+redis:
+  url: redis://redis:6379/0
+
+ui:
+  static_use_hash: false
+  default_locale: "pt-BR"
+  query_in_title: false
+  infinite_scroll: false
+  center_alignment: false
+  cache_url: false
+  search_on_category_select: true
+  hotkeys: default
+  theme_args:
+    simple_style: auto
+
+# Configurações de mecanismos de busca
+engines:
+  - name: google
+    engine: google
+    shortcut: g
+    disabled: false
+    
+  - name: bing
+    engine: bing
+    shortcut: b
+    disabled: false
+    
+  - name: duckduckgo
+    engine: duckduckgo
+    shortcut: ddg
+    disabled: false
+    
+  - name: startpage
+    engine: startpage
+    shortcut: sp
+    disabled: false
+    
+  - name: wikipedia
+    engine: wikipedia
+    shortcut: wp
+    disabled: false
+    
+  - name: reddit
+    engine: reddit
+    shortcut: re
+    disabled: false
+    
+  - name: github
+    engine: github
+    shortcut: gh
+    disabled: false
+    
+  - name: stackoverflow
+    engine: stackoverflow
+    shortcut: so
+    disabled: false
+
+# Configurações de categorias
+categories_as_tabs:
+  general:
+    - google
+    - bing
+    - duckduckgo
+    - startpage
+  
+  images:
+    - google images
+    - bing images
+  
+  news:
+    - google news
+    - bing news
+  
+  social:
+    - reddit
+  
+  it:
+    - github
+    - stackoverflow
+EOF
+    
+    echo "✅ Configuração do SearxNG criada"
+fi
 
 # Gerar chaves secretas aleatórias se não existirem
 if [ ! -f .env ]; then
-    echo "🔑 Gerando chaves secretas..."
+    echo "🔑 Gerando arquivo .env com chaves secretas..."
     
-    WEBUI_SECRET=$(openssl rand -base64 32)
+    WEBUI_SECRET=$(openssl rand -hex 32)
+    SEARXNG_SECRET=$(openssl rand -hex 32)
     
-    cat > .env << EOF
-# Chaves secretas geradas automaticamente
-WEBUI_SECRET_KEY=${WEBUI_SECRET}
-
-
-# Configurações do ambiente
-COMPOSE_PROJECT_NAME=ai-local-stack
-EOF
+    cp .env .env
     
-    echo "✅ Arquivo .env criado com chaves secretas"
+    # Atualizar as chaves secretas no arquivo .env
+    sed -i "s/WEBUI_SECRET_KEY=.*/WEBUI_SECRET_KEY=${WEBUI_SECRET}/" .env
+    sed -i "s/SEARXNG_SECRET=.*/SEARXNG_SECRET=${SEARXNG_SECRET}/" .env
+    
+    echo "✅ Chaves secretas atualizadas no .env"
 fi
 
 # Verificar se os arquivos de configuração existem
@@ -78,9 +209,16 @@ if [ ! -f "docker-compose.yml" ]; then
     exit 1
 fi
 
+# Criar network se não existir
+docker network create ai-network 2>/dev/null || true
+
 # Baixar imagens Docker
 echo "⬇️  Baixando imagens Docker..."
 docker-compose pull
+
+# Configurar permissões do SearxNG
+echo "🔧 Configurando permissões..."
+sudo chown -R 977:977 searxng/ 2>/dev/null || true
 
 echo ""
 echo "✅ Configuração concluída!"
@@ -88,9 +226,15 @@ echo ""
 echo "Para iniciar o sistema:"
 echo "  docker-compose up -d"
 echo ""
-echo "Para baixar modelos do Ollama:"
-echo "  docker exec -it ollama ollama pull llama3.2:3b"
+echo "Para baixar alguns modelos do Ollama:"
+echo "  # Modelo pequeno e rápido (1.3GB)"
 echo "  docker exec -it ollama ollama pull llama3.2:1b"
+echo ""
+echo "  # Modelo médio e balanceado (2GB)"
+echo "  docker exec -it ollama ollama pull llama3.2:3b"
+echo ""
+echo "  # Modelo português otimizado (4GB)"
+echo "  docker exec -it ollama ollama pull sabia-2:7b"
 echo ""
 echo "URLs de acesso:"
 echo "  • Open Web UI: http://localhost:3000"
@@ -102,3 +246,6 @@ echo "  docker-compose down"
 echo ""
 echo "Para ver logs:"
 echo "  docker-compose logs -f"
+echo ""
+echo "Para reiniciar um serviço:"
+echo "  docker-compose restart searxng"
